@@ -1,0 +1,94 @@
+/**
+ * Malaysia Transit MCP Server
+ * Provides tools to access real-time bus and train information across Malaysia
+ * 
+ * Data source: Malaysia Transit Middleware API
+ */
+import dotenv from 'dotenv';
+
+// Initialize dotenv to load environment variables from .env file
+dotenv.config();
+
+/**
+ * =====================================================================
+ * IMPORTANT GUIDANCE FOR AI MODELS USING THIS MCP SERVER:
+ * =====================================================================
+ * 1. ALWAYS use 'list_service_areas' first to discover available transit areas
+ * 
+ * 2. Use 'search_stops' to find bus/train stops by name
+ * 
+ * 3. Use 'get_stop_arrivals' to get real-time arrival information
+ * 
+ * 4. Use 'get_live_vehicles' to see real-time bus/train positions
+ * 
+ * 5. Use 'list_routes' to discover available routes in an area
+ * 
+ * 6. All tools require an 'area' parameter (e.g., 'penang', 'klang-valley')
+ * =====================================================================
+ */
+
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { z } from 'zod';
+
+// Import transit tools
+import { registerTransitTools } from './transit.tools.js';
+
+// Define the config schema
+export const configSchema = z.object({
+  // Middleware API URL
+  middlewareUrl: z.string()
+    .default('http://localhost:3000')
+    .describe('URL of the Malaysia Transit Middleware API. Default: http://localhost:3000'),
+});
+
+/**
+ * Creates a stateless MCP server for Malaysia Transit API
+ */
+export default function createStatelessServer({
+  config: _config,
+}: {
+  config: z.infer<typeof configSchema>;
+}) {
+  const server = new McpServer({
+    name: 'Malaysia Transit MCP Server',
+    version: '1.0.0',
+  });
+
+  // Extract config values
+  const { middlewareUrl } = _config;
+  
+  // Set middleware URL in process.env if provided in config
+  if (middlewareUrl) {
+    process.env.MIDDLEWARE_URL = middlewareUrl;
+    console.log(`Using middleware URL: ${middlewareUrl}`);
+  }
+  
+  // Register transit tools
+  registerTransitTools(server);
+
+  // Register a simple hello tool for testing
+  server.tool(
+    'hello',
+    'A simple test tool to verify that the MCP server is working correctly',
+    {},
+    async () => {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify({
+              message: 'Hello from Malaysia Transit MCP!',
+              timestamp: new Date().toISOString(),
+              middlewareUrl: process.env.MIDDLEWARE_URL || 'http://localhost:3000',
+            }, null, 2),
+          },
+        ],
+      };
+    }
+  );
+
+  return server.server;
+}
+
+// If this file is run directly, log a message
+console.log('Malaysia Transit MCP module loaded');

@@ -1,0 +1,72 @@
+{
+  "name": "mcp-malaysiatransit",
+  "version": "1.0.0",
+  "description": "Malaysia Transit MCP Server - Real-time bus and train information across Malaysia",
+  "main": "./src/index.ts",
+  "module": "./src/index.ts",
+  "type": "module",
+  "files": [
+    "dist/**/*",
+    "README.md",
+    "LICENSE",
+    "TOOLS.md",
+    "PROMPT.md"
+  ],
+  "scripts": {
+    "start": "node index.js",
+    "build": "tsc",
+    "prepublishOnly": "npm run build",
+    "dev": "npx @smithery/cli@latest dev",
+    "playground": "npx @smithery/cli@latest build && npx @smithery/cli@latest playground --port 3000",
+    "serve": "npm run build && node dist/server.js",
+    "inspect": "npm run build && npx @modelcontextprotocol/inspector node dist/inspector.js",
+    "deploy": "npm run build && npx @smithery/cli@latest deploy",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "lint": "eslint src/**/*.ts",
+    "lint:fix": "eslint src/**/*.ts --fix",
+    "format": "prettier --write src/**/*.ts",
+    "format:check": "prettier --check src/**/*.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "mcp",
+    "smithery",
+    "malaysia",
+    "transit",
+    "gtfs",
+    "bus",
+    "train",
+    "public-transport",
+    "rapid-kl",
+    "prasarana"
+  ],
+  "author": "hithereiamaliff",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/hithereiamaliff/malaysiatransit-mcp.git"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.1",
+    "axios": "^1.11.0",
+    "dotenv": "^17.2.1",
+    "zod": "^3.25.57"
+  },
+  "devDependencies": {
+    "@smithery/cli": "^1.2.16",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.5",
+    "@types/node": "^22.15.31",
+    "@typescript-eslint/eslint-plugin": "^8.34.0",
+    "@typescript-eslint/parser": "^8.34.0",
+    "eslint": "^9.28.0",
+    "eslint-config-prettier": "^10.1.5",
+    "eslint-plugin-prettier": "^5.4.1",
+    "prettier": "^3.5.3",
+    "tsx": "^4.7.0",
+    "typescript": "^5.8.3"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
