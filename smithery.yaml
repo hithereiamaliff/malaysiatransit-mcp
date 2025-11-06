@@ -1,1 +1,7 @@
 version: "1.0"
+runtime: typescript
+config:
+  middlewareUrl:
+    type: string
+    description: "Malaysia Transit Middleware API URL"
+    default: "http://localhost:3000"
