@@ -1,0 +1,227 @@
+/**
+ * Geocoding utilities using Nominatim API
+ * Maps Malaysian locations to transit service areas
+ */
+
+import axios from 'axios';
+
+// Nominatim API endpoint
+const NOMINATIM_API = 'https://nominatim.openstreetmap.org';
+
+// User agent for Nominatim (required by usage policy)
+const USER_AGENT = 'MalaysiaTransitMCP/1.0';
+
+// Mapping of Malaysian states/regions to transit service areas
+const STATE_TO_AREA_MAP: Record<string, string> = {
+  // Kedah
+  'kedah': 'alor-setar',
+  'alor setar': 'alor-setar',
+  'alor star': 'alor-setar',
+  
+  // Perlis
+  'perlis': 'kangar',
+  'kangar': 'kangar',
+  
+  // Penang
+  'penang': 'penang',
+  'pulau pinang': 'penang',
+  'george town': 'penang',
+  'georgetown': 'penang',
+  
+  // Kelantan
+  'kelantan': 'kota-bharu',
+  'kota bharu': 'kota-bharu',
+  'kota bahru': 'kota-bharu',
+  
+  // Terengganu
+  'terengganu': 'kuala-terengganu',
+  'kuala terengganu': 'kuala-terengganu',
+  
+  // Pahang
+  'pahang': 'kuantan',
+  'kuantan': 'kuantan',
+  
+  // Selangor / KL / Putrajaya (Klang Valley)
+  'selangor': 'klang-valley',
+  'kuala lumpur': 'klang-valley',
+  'kl': 'klang-valley',
+  'putrajaya': 'klang-valley',
+  'petaling jaya': 'klang-valley',
+  'shah alam': 'klang-valley',
+  'klang': 'klang-valley',
+  'subang jaya': 'klang-valley',
+  'cyberjaya': 'klang-valley',
+  
+  // Melaka
+  'melaka': 'melaka',
+  'malacca': 'melaka',
+  
+  // Johor
+  'johor': 'johor',
+  'johor bahru': 'johor',
+  'johor baharu': 'johor',
+  'jb': 'johor',
+  
+  // Sarawak
+  'sarawak': 'kuching',
+  'kuching': 'kuching',
+};
+
+// City/location to area direct mapping (for common queries)
+const LOCATION_TO_AREA_MAP: Record<string, string> = {
+  'komtar': 'penang',
+  'bayan lepas': 'penang',
+  'butterworth': 'penang',
+  'klcc': 'klang-valley',
+  'klia': 'klang-valley',
+  'klia2': 'klang-valley',
+  'mid valley': 'klang-valley',
+  'pavilion': 'klang-valley',
+  'sunway': 'klang-valley',
+  '1 utama': 'klang-valley',
+};
+
+export interface GeocodingResult {
+  area: string;
+  confidence: 'high' | 'medium' | 'low';
+  location: {
+    name: string;
+    state?: string;
+    country?: string;
+    lat: number;
+    lon: number;
+  };
+  source: 'direct_match' | 'state_mapping' | 'geocoding';
+}
+
+/**
+ * Detect the transit service area from a location query
+ */
+export async function detectAreaFromLocation(query: string): Promise<GeocodingResult | null> {
+  const normalizedQuery = query.toLowerCase().trim();
+  
+  // 1. Check direct location mapping first (fastest)
+  for (const [location, area] of Object.entries(LOCATION_TO_AREA_MAP)) {
+    if (normalizedQuery.includes(location)) {
+      return {
+        area,
+        confidence: 'high',
+        location: {
+          name: query,
+          lat: 0,
+          lon: 0,
+        },
+        source: 'direct_match',
+      };
+    }
+  }
+  
+  // 2. Check state mapping
+  for (const [state, area] of Object.entries(STATE_TO_AREA_MAP)) {
+    if (normalizedQuery.includes(state)) {
+      return {
+        area,
+        confidence: 'high',
+        location: {
+          name: query,
+          state,
+          lat: 0,
+          lon: 0,
+        },
+        source: 'state_mapping',
+      };
+    }
+  }
+  
+  // 3. Use Nominatim geocoding as fallback
+  try {
+    const geocodingResult = await geocodeLocation(query);
+    if (geocodingResult) {
+      return geocodingResult;
+    }
+  } catch (error) {
+    console.error('Geocoding error:', error);
+  }
+  
+  return null;
+}
+
+/**
+ * Geocode a location using Nominatim API
+ */
+async function geocodeLocation(query: string): Promise<GeocodingResult | null> {
+  try {
+    // Add "Malaysia" to the query if not already present
+    const searchQuery = query.toLowerCase().includes('malaysia') 
+      ? query 
+      : `${query}, Malaysia`;
+    
+    const response = await axios.get(`${NOMINATIM_API}/search`, {
+      params: {
+        q: searchQuery,
+        format: 'json',
+        addressdetails: 1,
+        limit: 1,
+        countrycodes: 'my', // Restrict to Malaysia
+      },
+      headers: {
+        'User-Agent': USER_AGENT,
+      },
+      timeout: 5000,
+    });
+    
+    if (response.data && response.data.length > 0) {
+      const result = response.data[0];
+      const address = result.address || {};
+      
+      // Extract state information
+      const state = address.state?.toLowerCase() || '';
+      const city = address.city?.toLowerCase() || address.town?.toLowerCase() || '';
+      
+      // Try to map state to area
+      let area = STATE_TO_AREA_MAP[state];
+      
+      // If no state match, try city
+      if (!area && city) {
+        area = STATE_TO_AREA_MAP[city];
+      }
+      
+      if (area) {
+        return {
+          area,
+          confidence: 'medium',
+          location: {
+            name: result.display_name,
+            state: address.state,
+            country: address.country,
+            lat: parseFloat(result.lat),
+            lon: parseFloat(result.lon),
+          },
+          source: 'geocoding',
+        };
+      }
+    }
+  } catch (error: any) {
+    console.error('Nominatim geocoding failed:', error.message);
+  }
+  
+  return null;
+}
+
+/**
+ * Get all available service areas with their states
+ */
+export function getAreaStateMapping(): Record<string, string[]> {
+  return {
+    'alor-setar': ['Kedah'],
+    'kangar': ['Perlis'],
+    'penang': ['Penang', 'Pulau Pinang'],
+    'kota-bharu': ['Kelantan'],
+    'kuala-terengganu': ['Terengganu'],
+    'kuantan': ['Pahang'],
+    'klang-valley': ['Selangor', 'Kuala Lumpur', 'Putrajaya'],
+    'melaka': ['Melaka', 'Malacca'],
+    'johor': ['Johor'],
+    'kuching': ['Sarawak'],
+  };
+}

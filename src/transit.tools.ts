@@ -6,6 +6,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import axios from 'axios';
+import { detectAreaFromLocation, getAreaStateMapping } from './geocoding.utils.js';
 
 // Get middleware URL from environment
 const getMiddlewareUrl = (): string => {
@@ -44,6 +45,65 @@ export function registerTransitTools(server: McpServer): void {
               type: 'text',
               text: JSON.stringify({
                 error: 'Failed to fetch service areas',
+                message: error.message,
+              }, null, 2),
+            },
+          ],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  server.tool(
+    'detect_location_area',
+    'Automatically detect which transit service area a location belongs to using geocoding. Use this when the user mentions a place name without specifying the area (e.g., "KTM Alor Setar", "Komtar", "KLCC")',
+    {
+      location: z.coerce.string().describe('Location name or place (e.g., "KTM Alor Setar", "Komtar", "Pavilion KL")'),
+    },
+    async ({ location }) => {
+      try {
+        const result = await detectAreaFromLocation(location);
+        
+        if (result) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify({
+                  success: true,
+                  area: result.area,
+                  confidence: result.confidence,
+                  location: result.location,
+                  source: result.source,
+                  message: `Location "${location}" detected in service area: ${result.area}`,
+                }, null, 2),
+              },
+            ],
+          };
+        } else {
+          // Return available areas if detection fails
+          const areaMapping = getAreaStateMapping();
+          return {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify({
+                  success: false,
+                  message: `Could not automatically detect service area for "${location}". Please specify the area manually.`,
+                  availableAreas: areaMapping,
+                }, null, 2),
+              },
+            ],
+          };
+        }
+      } catch (error: any) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                error: 'Failed to detect location area',
                 message: error.message,
               }, null, 2),
             },
@@ -95,9 +155,9 @@ export function registerTransitTools(server: McpServer): void {
 
   server.tool(
     'search_stops',
-    'Search for bus or train stops by name in a specific area',
+    'Search for bus or train stops by name in a specific area. IMPORTANT: If you are unsure which area a location belongs to, use detect_location_area first to automatically determine the correct area.',
     {
-      area: z.coerce.string().describe('Service area ID (e.g., "penang", "klang-valley")'),
+      area: z.coerce.string().describe('Service area ID (e.g., "penang", "klang-valley"). Use detect_location_area if unsure.'),
       query: z.coerce.string().describe('Search query (e.g., "Komtar", "KLCC")'),
     },
     async ({ area, query }) => {
