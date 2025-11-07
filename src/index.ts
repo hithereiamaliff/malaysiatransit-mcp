@@ -39,6 +39,12 @@ export const configSchema = z.object({
   middlewareUrl: z.string()
     .default('https://malaysiatransit.techmavie.digital')
     .describe('URL of the Malaysia Transit Middleware API. Default: https://malaysiatransit.techmavie.digital'),
+  
+  // Google Maps API Key (optional)
+  googleMapsApiKey: z.string()
+    .optional()
+    .default('')
+    .describe('Google Maps API Key for geocoding (optional, falls back to Nominatim if not provided)'),
 });
 
 /**
@@ -55,12 +61,20 @@ export default function createStatelessServer({
   });
 
   // Extract config values
-  const { middlewareUrl } = _config;
+  const { middlewareUrl, googleMapsApiKey } = _config;
   
   // Set middleware URL in process.env if provided in config
   if (middlewareUrl) {
     process.env.MIDDLEWARE_URL = middlewareUrl;
     console.log(`Using middleware URL: ${middlewareUrl}`);
+  }
+  
+  // Set Google Maps API key in process.env if provided in config
+  if (googleMapsApiKey) {
+    process.env.GOOGLE_MAPS_API_KEY = googleMapsApiKey;
+    console.log(`Google Maps API key configured for geocoding`);
+  } else {
+    console.log(`No Google Maps API key provided, will use Nominatim for geocoding`);
   }
   
   // Register transit tools

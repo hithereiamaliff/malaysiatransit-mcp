@@ -18,7 +18,8 @@ app.use(express.json());
 // Create the MCP server once (reused across requests)
 const server = createStatelessServer({
   config: {
-    middlewareUrl: process.env.MIDDLEWARE_URL || 'http://localhost:3000'
+    middlewareUrl: process.env.MIDDLEWARE_URL || 'http://localhost:3000',
+    googleMapsApiKey: process.env.GOOGLE_MAPS_API_KEY || ''
   }
 });
 
